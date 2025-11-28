@@ -3,7 +3,7 @@
 <head> 
     <meta charset="UTF-8"> 
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
-    <title>Extrusion Inventory (Login Secured)</title> 
+    <title>Extrusion Inventory (Session Secured)</title> 
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script> 
     <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script> 
  
@@ -11,18 +11,18 @@
         /* 全域設定 */ 
         * { box-sizing: border-box; } 
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 10px; background-color: #222; color: #fff; } 
-          
-        h2 { text-align: center; margin-bottom: 10px; font-size: 2.5rem; color: #eee; font-weight: bold; letter-spacing: 1px; } 
+           
+        h2 { text-align: center; margin-bottom: 10px; font-size: 2.1rem; color: #eee; font-weight: bold; letter-spacing: 1px; } 
  
         /* ========================================= */
-        /* 🔒 登入畫面樣式 (新增部分)                 */
+        /* 🔒 登入畫面樣式                          */
         /* ========================================= */
         #login-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
             background-color: #000;
             z-index: 10000; /* 最高層級，蓋住所有內容 */
-            display: flex;
+            display: flex; /* 預設顯示，但在 JS 中會判斷是否隱藏 */
             justify-content: center;
             align-items: center;
             flex-direction: column;
@@ -60,7 +60,7 @@
             flex: 1; min-width: 100px; padding: 8px; border: 1px solid #555; border-radius: 4px; 
             background: #fff; color: #000; font-size: 1.1rem; letter-spacing: 1px; font-weight: bold; 
         } 
-        
+         
         /* 鎖定按鈕樣式 */
         .btn-lock-user {
             background-color: #dc3545; color: white; border: none; padding: 8px 12px;
@@ -178,7 +178,7 @@
           
         .code-col { width: 30%; word-break: break-all; }  
         .loc-col { width: 15%; text-align: center; }        
-        .name-col { width: 20%; }                          
+        .name-col { width: 20%; }                           
           
         th.qty-col, td.qty-col {  
             width: 10%;  
@@ -218,7 +218,7 @@
     </style> 
 </head> 
 <body> 
-
+ 
     <div id="login-overlay">
         <div class="login-box">
             <h3>🔒 系統鎖定 System Locked</h3>
@@ -375,13 +375,24 @@
         let isCameraActive = false; 
 
         // ========================================== 
-        // 🔒 登入/鎖定 功能邏輯
+        // 🔒 登入/鎖定 功能邏輯 (Session Secured)
         // ========================================== 
         
-        // 頁面載入時聚焦在密碼框
-        window.onload = function() {
-            document.getElementById('login-pwd').focus();
-        };
+        // 頁面載入時：檢查 Session 是否已登入
+        document.addEventListener('DOMContentLoaded', () => {
+            const isLoggedIn = sessionStorage.getItem('is_auth_valid');
+            const overlay = document.getElementById('login-overlay');
+            const input = document.getElementById('login-pwd');
+
+            if (isLoggedIn === 'true') {
+                // 已登入過，隱藏遮罩
+                overlay.style.display = 'none';
+            } else {
+                // 未登入，顯示遮罩並聚焦
+                overlay.style.display = 'flex';
+                input.focus();
+            }
+        });
 
         // 監聽密碼框 Enter 鍵
         document.getElementById('login-pwd').addEventListener("keypress", function(event) {
@@ -394,7 +405,9 @@
             const input = document.getElementById('login-pwd');
             const val = input.value;
             if (val === APP_PASSWORD) {
-                // 登入成功
+                // 登入成功：寫入 Session Storage
+                sessionStorage.setItem('is_auth_valid', 'true');
+                
                 document.getElementById('login-overlay').style.display = 'none';
                 input.value = ""; // 清空密碼框
             } else {
@@ -405,15 +418,16 @@
         }
 
         function lockApp() {
+            // 手動鎖定：清除 Session
+            sessionStorage.removeItem('is_auth_valid');
+
             document.getElementById('login-overlay').style.display = 'flex';
             document.getElementById('login-pwd').focus();
             
             // 鎖定時停止相機以省電
-            if (isCameraActive) {
-                // 模擬點擊切換來關閉相機，或者直接暫停
-                // 這裡我們簡單處理，不強制關閉相機，只遮蔽畫面
-                // 如果需要強制關閉相機，可以呼叫 stopScanning()
-            }
+            stopOcrCamera();
+            stopBarcodeScanner();
+            isCameraActive = false;
         }
         // ========================================== 
  
@@ -850,7 +864,7 @@
                     link.click(); 
                     document.body.removeChild(link); 
                     URL.revokeObjectURL(url); 
-                    alert("✅ 匯出完成: " + filename); // 🐛 Fixed typo: fileName -> filename
+                    alert("✅ 匯出完成: " + filename); 
                 }, 100); 
             } catch (err) { alert("匯出錯誤: " + err); } 
         } 
