@@ -16,6 +16,32 @@
         
         h2 { text-align: center; margin-bottom: 10px; font-size: 2.1rem; color: #eee; font-weight: bold; letter-spacing: 1px; }
 
+        /* =========================================
+           🔐 新增：登入鎖定畫面樣式
+           ========================================= */
+        #login-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #000; z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .login-box {
+            background: #333; padding: 30px; border-radius: 12px; border: 1px solid #555;
+            text-align: center; width: 90%; max-width: 350px;
+            box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
+        }
+        .login-box h3 { margin-top: 0; color: #fff; margin-bottom: 20px; }
+        .login-input {
+            width: 100%; padding: 12px; font-size: 1.2rem; text-align: center;
+            border-radius: 6px; border: 1px solid #555; background: #222; color: white;
+            margin-bottom: 15px; letter-spacing: 2px;
+        }
+        .login-btn {
+            width: 100%; padding: 12px; font-size: 1.1rem; font-weight: bold;
+            border: none; border-radius: 6px; cursor: pointer;
+            background: #007bff; color: white; transition: 0.3s;
+        }
+        .login-btn:active { transform: scale(0.98); }
+
         /* 人員代號輸入區 */
         .user-bar {
             display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px;
@@ -28,6 +54,13 @@
             background: #fff; color: #000; font-size: 1.1rem; letter-spacing: 1px; font-weight: bold;
         }
         
+        /* 🔒 新增：鎖定按鈕 */
+        .btn-lock {
+            background-color: #dc3545; color: white; border: none; padding: 8px 12px;
+            border-radius: 6px; cursor: pointer; font-size: 1.2rem;
+            display: flex; align-items: center; justify-content: center;
+        }
+
         /* 模式切換按鈕 */
         .mode-switch { display: flex; gap: 8px; margin-bottom: 10px; }
         .mode-btn { 
@@ -139,7 +172,7 @@
         
         .code-col { width: 30%; word-break: break-all; } 
         .loc-col { width: 15%; text-align: center; }      
-        .name-col { width: 20%; }                         
+        .name-col { width: 20%; }                          
         
         th.qty-col, td.qty-col { 
             width: 10%; 
@@ -180,11 +213,23 @@
 </head>
 <body>
 
+    <div id="login-screen">
+        <div class="login-box">
+            <h3>🔒 系統鎖定 (Locked)</h3>
+            <input type="password" id="loginPass" class="login-input" placeholder="Enter Password" autofocus>
+            <button class="login-btn" onclick="checkLogin()">登入 (Login)</button>
+        </div>
+    </div>
+
     <h2>Extrusion Inventory</h2>
 
     <div class="user-bar">
-        <label>👤 人員代號 (User):</label>
+        <label>👤 人員 (User):</label>
         <input type="text" id="userInput" class="input-field" placeholder="請先輸入代號" onchange="changeUser(this.value)">
+        
+        <button class="btn-lock" onclick="lockScreen()" title="鎖定畫面 (Lock Screen)">
+            🔒
+        </button>
     </div>
 
     <div class="mode-switch">
@@ -288,15 +333,16 @@
 
     <script>
         // ==========================================
-        // 🔧 核心設定區 (System Config) - 網址寫死在此處
+        // 🔧 核心設定區 & 登入密碼
         // ==========================================
         const SYSTEM_CONFIG = {
-            // Google Script 網址 (上傳用)
             API_URL: "https://script.google.com/macros/s/AKfycbwUQxxAoN3Wk_Gtm4ETH-Vwxb40AHo3i9otrsNV-99Bi6V7GfFztSnJX9pNlNGWuq72/exec",
-            
-            // Google 試算表網址 (檢視用)
             SHEET_URL: "https://docs.google.com/spreadsheets/d/1ZjSEp4d_j2zZoCV_xQoMSl7HSA9VcPV7pbE2lXXxUW8/edit?gid=0#gid=0"
         };
+        
+        // 🔐 登入密碼設定
+        const APP_PASSWORD = "1122334";
+
         // ==========================================
 
         let savedUser = localStorage.getItem('currentUser') || "Default"; 
@@ -304,14 +350,11 @@
         let inventory = {}; 
         let lastLocation = localStorage.getItem('lastLocation') || "";
 
-        // 讀取一般使用者設定
         let appSettings = JSON.parse(localStorage.getItem('appSettings')) || {};
-
         if (appSettings.decimals === undefined) appSettings.decimals = 2;
         if (appSettings.minLen === undefined) appSettings.minLen = 4;
         if (appSettings.maxLen === undefined) appSettings.maxLen = 50;
         if (!appSettings.filenameFormat) appSettings.filenameFormat = "USER_YYYYMMDDHHmmss";
-
         localStorage.setItem('appSettings', JSON.stringify(appSettings));
 
         let html5QrcodeScanner = null;
@@ -324,6 +367,39 @@
         let isCameraActive = false;
 
         loadInventoryForUser(savedUser);
+
+        // ==========================================
+        // 🔐 登入與鎖定邏輯
+        // ==========================================
+        function checkLogin() {
+            const input = document.getElementById('loginPass');
+            if (input.value === APP_PASSWORD) {
+                document.getElementById('login-screen').style.display = 'none';
+                input.value = ""; // 清除密碼欄位
+            } else {
+                alert("❌ 密碼錯誤 (Wrong Password)");
+                input.value = "";
+                input.focus();
+            }
+        }
+
+        // 綁定 Enter 鍵登入
+        document.getElementById('loginPass').addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                checkLogin();
+            }
+        });
+
+        function lockScreen() {
+            // 關閉任何開啟的相機
+            stopOcrCamera();
+            stopBarcodeScanner();
+            // 顯示鎖定畫面
+            document.getElementById('login-screen').style.display = 'flex';
+            document.getElementById('loginPass').focus();
+        }
+        // ==========================================
 
         function changeUser(val) {
             val = val.trim();
@@ -346,15 +422,12 @@
         }
 
         function openSettings() {
-            // 讀取設定
             appSettings = JSON.parse(localStorage.getItem('appSettings')) || {};
-
             document.getElementById('set_decimals').value = appSettings.decimals;
             document.getElementById('set_minLen').value = appSettings.minLen;
             document.getElementById('set_maxLen').value = appSettings.maxLen;
             document.getElementById('set_filename').value = appSettings.filenameFormat;
             
-            // 顯示寫死的網址 (僅供查看，不可修改)
             document.getElementById('display_cloudUrl').value = SYSTEM_CONFIG.API_URL;
             document.getElementById('display_sheetUrl').value = SYSTEM_CONFIG.SHEET_URL;
             
@@ -369,17 +442,13 @@
             appSettings.maxLen = parseInt(document.getElementById('set_maxLen').value);
             appSettings.filenameFormat = document.getElementById('set_filename').value.trim();
             
-            // 注意：我們不需要儲存網址，因為已經寫死在程式碼中
-
             localStorage.setItem('appSettings', JSON.stringify(appSettings));
-            
             closeSettings();
             renderTable();
             alert("✅ 設定已儲存");
         }
 
         function openCloudSheet() {
-            // 直接開啟寫死的網址
             window.open(SYSTEM_CONFIG.SHEET_URL, '_blank');
         }
 
@@ -455,9 +524,9 @@
                 saveDataPrompt(decodedText); 
             }, () => {}).catch(err => {
                 if (err.toString().includes("NotAllowed") || err.toString().includes("Permission")) {
-                    alert("❌ 無法存取相機，請至設定開啟權限\n(Camera access denied. Please enable permission in settings.)");
+                    alert("❌ 無法存取相機，請至設定開啟權限");
                 } else {
-                    alert("Barcode Start Error: " + err);
+                    console.log("Barcode Start Error: " + err);
                 }
             });
         }
@@ -481,10 +550,10 @@
                 isScanning = true;
                 startImageAnalysis(video);
             } catch (err) { 
-                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.toString().includes("Permission")) {
-                    alert("❌ 無法存取相機，請至設定開啟權限\n(Camera access denied. Please enable permission in settings.)");
+                if (err.name === 'NotAllowedError' || err.toString().includes("Permission")) {
+                    alert("❌ 無法存取相機，請至設定開啟權限");
                 } else {
-                    alert("Camera Error: " + err); 
+                    console.log("Camera Error: " + err); 
                 }
             }
         }
@@ -589,9 +658,18 @@
 
         function processResult(text) {
              let cleanText = text.replace(/[^a-zA-Z0-9.-]/g, "");
+             
+             // 💡 修改：稍微放寬判斷 (只要有字元且長度符合即可)
+             if (cleanText.length < appSettings.minLen) {
+                 alert("⚠️ 未偵測到清晰文字，請重試");
+                 return;
+             }
+
+             // 嘗試尋找標準格式，如果找不到就用原文字
              const strongPattern = /[A-Z0-9]+(-[A-Z0-9.]+){3,}/;
              const match = cleanText.match(strongPattern);
              if (match) { cleanText = match[0]; } 
+             
              cleanText = cleanText.replace(/^[-.]+|[-.]+$/g, "");
 
             if (!cleanText) { alert("⚠️ 未偵測到文字，請重試"); return; }
@@ -688,7 +766,6 @@
             if (Object.keys(inventory).length === 0) return alert("❌ 無資料");
             if (!savedUser || savedUser === "Default") return alert("⚠️ 請輸入人員代號");
             
-            // 直接使用寫死的 SYSTEM_CONFIG.API_URL
             if(!confirm("確定上傳至雲端?")) return;
 
             document.getElementById('loading-overlay').style.display = 'flex';
@@ -718,7 +795,6 @@
             if (Object.keys(inventory).length === 0) { return alert("❌ 無資料 (No Data)"); }
             if (!savedUser || savedUser === "Default") { return alert("⚠️ 請先輸入人員代號！"); }
 
-            alert("1. 準備匯出... (Starting Export)");
             try {
                 let csv = "\uFEFFCode,Spec,Location,Name,Qty\n";
                 for (let k in inventory) {
@@ -769,11 +845,28 @@
             }
         }
 
-        currentMode = 'ocr';
-        document.querySelector('.mode-btn[onclick="switchMode(\'ocr\')"]').classList.add('active');
-        document.querySelector('.mode-btn[onclick="switchMode(\'barcode\')"]').classList.remove('active');
-        document.getElementById('guideText').innerText = "👆 點擊畫面啟動相機 Tap to Start";
-        renderTable();
+        // ==========================================
+        // 🚀 程式初始化入口 (Bug Fix & Login Init)
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            // 預設載入使用者上次的位置
+            if(lastLocation) {
+                console.log("Last Location loaded:", lastLocation);
+            }
+
+            // 確保一開始是條碼模式
+            switchMode('barcode');
+            
+            // 畫面初始化：確保鎖定畫面顯示 (因為 CSS 預設是 flex, 但為了保險起見)
+            document.getElementById('login-screen').style.display = 'flex';
+        });
+
+        // 監聽網頁關閉或重新整理，確保相機資源釋放
+        window.addEventListener('beforeunload', () => {
+            stopOcrCamera();
+            stopBarcodeScanner();
+        });
+
     </script>
 </body>
 </html>
