@@ -668,10 +668,25 @@
                     localStorage.setItem('lastLocation', lastLocation);
                 }
 
+                // ============================================
+                // 🕒 印度時間 (IST) 紀錄功能 (UTC+5:30)
+                // ============================================
+                const d = new Date();
+                const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+                const nd = new Date(utc + (3600000 * 5.5));
+                const year = nd.getFullYear();
+                const month = String(nd.getMonth() + 1).padStart(2, '0');
+                const day = String(nd.getDate()).padStart(2, '0');
+                const hour = String(nd.getHours()).padStart(2, '0');
+                const minute = String(nd.getMinutes()).padStart(2, '0');
+                const second = String(nd.getSeconds()).padStart(2, '0');
+                const istTime = `${year}/${month}/${day} ${hour}:${minute}:${second}`;
+
                 inventory[code] = {
                     name: name || "No Name",
                     qty: qty,
-                    location: location
+                    location: location,
+                    scanTime: istTime // 儲存時間
                 };
 
                 saveCurrentInventory();
@@ -703,6 +718,12 @@
             
             if(!confirm("確定上傳至雲端?")) return;
 
+            // === 修改處：強制在確認後立刻清空庫位記憶 ===
+            // 這樣不需要等雲端回應，下一次掃描庫位就會是空白
+            lastLocation = "";
+            localStorage.removeItem('lastLocation'); 
+            // ===================================
+
             document.getElementById('loading-overlay').style.display = 'flex';
             document.getElementById('loading-text').innerText = "上傳中... Uploading...";
 
@@ -732,15 +753,17 @@
 
             alert("1. 準備匯出... (Starting Export)");
             try {
-                let csv = "\uFEFFCode,Spec,Location,Name,Qty\n";
+                // === 修改處：增加 Time 欄位 ===
+                let csv = "\uFEFFCode,Spec,Location,Name,Qty,Time\n";
                 for (let k in inventory) {
                       let safeName = (inventory[k].name || "").replace(/,/g, " ").replace(/"/g, "");
                       let loc = (inventory[k].location || "").replace(/,/g, " ");
                       let parts = k.split('-');
                       let middleTxt = parts.length >= 3 ? parts[1] : "";
                       let qtyFormatted = inventory[k].qty.toFixed(appSettings.decimals);
+                      let timeStr = inventory[k].scanTime || ""; // 取得時間
 
-                      csv += '="' + k + '","' + middleTxt + '","' + loc + '","' + safeName + '",' + qtyFormatted + '\n';
+                      csv += '="' + k + '","' + middleTxt + '","' + loc + '","' + safeName + '",' + qtyFormatted + ',"' + timeStr + '"\n';
                 }
                 let blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                 let url = URL.createObjectURL(blob);
